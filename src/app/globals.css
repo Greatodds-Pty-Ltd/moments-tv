@@ -1,0 +1,10 @@
+:root { color-scheme: dark; --navy: #061F3F; --navy-2: #0A2A55; --line: #1B3B6B; --ink: #fff; --ink-2: #B9C8E4; --red: #F13131; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--navy); color: var(--ink); font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif; }
+.login-page { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
+.login-page .card { width: 100%; max-width: 420px; background: var(--navy-2); border: 1px solid var(--line); border-radius: 12px; padding: 36px 28px; text-align: center; }
+.login-page .logo { height: 48px; margin: 0 auto 24px; display: block; }
+.login-page h1 { font: 800 30px/1.1 "Barlow", Arial, sans-serif; margin: 0 0 8px; }
+.login-page p { color: var(--ink-2); font-size: 19px; margin: 0 0 24px; }
+.login-page .err { color: #FFC2C2; border: 1px solid #8C3A4A; border-radius: 6px; padding: 10px; margin: 0 0 16px; }
+.login-page form button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #1f1f1f; border: 0; border-radius: 8px; padding: 14px; font: 600 18px/1 Arial, sans-serif; cursor: pointer; }
