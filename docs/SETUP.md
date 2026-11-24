@@ -7,10 +7,10 @@ The TV reads the master **Moments Campaign Calendar – Rolling 12 Weeks** direc
 
 - The workbook is in a Sportingbet shared drive (checked 24 Nov 2026), so it survives staff changes.
 
-## 2. Image folder (marketing)
-1. In the same shared drive, create a folder **Moments TV images**. Upload sport images made with `docs/image-prompt.md`.
-2. Add a **TV images** tab to the master (columns `match_type, match_value, image_file, text_in_image, use_until, notes`; copy `sheet-template/tv-images.csv`) and fill `image_file` with the exact file name. Check every image for crests, logos or garbled text first.
-3. Note the folder ID (the string at the end of its URL).
+## 2. Image folder (done)
+**Moments TV images** in the shared drive, next to the calendar (folder ID `1WGH9A73uxYkS8olqNCI6wd92PIhu1KM8`), shared with the service account as Viewer. Set `GOOGLE_IMAGE_FOLDER_ID` to that ID in Vercel.
+
+To give an event its own hero image, upload a file named exactly like its **Event** in column C of the calendar, e.g. `Black Friday.png` (`.jpg`, `.png` or `.webp`). It shows within ~9 minutes. Images with no matching Event are listed at `/api/status` under `unmatchedImages`. Check every image for crests, logos or garbled text first (`docs/image-prompt.md`).
 
 ## 3. Service account (Brad / IT, Google Cloud)
 1. In the Sportingbet-owned GCP project, enable **Google Sheets API** and **Google Drive API**.

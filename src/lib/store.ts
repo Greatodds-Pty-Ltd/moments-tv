@@ -1,5 +1,5 @@
 import { Redis } from "@upstash/redis";
-import { normalize, type TvData, type TvImageRule } from "./calendar";
+import { imageKey, normalize, type TvData, type TvImageRule } from "./calendar";
 import { fetchTabs, listImages, sourceKind } from "./source";
 
 // Last-good snapshot of the sheet. Requests are the clock: when the stored
@@ -22,6 +22,7 @@ export interface Snapshot {
   checkedAt: string; // last attempt
   lastError: string | null;
   problems: string[]; // rows dropped or degraded in the last successful read
+  unmatchedImages?: string[]; // files in the image folder whose name matches no Event in column C
   source: "google" | "local";
 }
 
@@ -66,18 +67,33 @@ async function save(s: Snapshot): Promise<void> {
 
 async function build(): Promise<Snapshot> {
   const [tabs, files] = await Promise.all([fetchTabs(), listImages()]);
-  const { data, problems } = normalize(tabs);
+  const { data, problems, eventNames } = normalize(tabs);
+
+  // An image named exactly like an Event in column C ("Black Friday.png") is that event's hero image.
+  // These come first, so they win over the optional TV images tab.
+  const byKey = new Map<string, { name: string; id: string }>();
+  for (const [name, id] of files) if (!byKey.has(imageKey(name))) byKey.set(imageKey(name), { name, id });
+  const used = new Set<string>();
   const images: TvImage[] = [];
+  for (const { event, title } of eventNames) {
+    const hit = byKey.get(imageKey(event));
+    if (!hit || images.some((i) => i.matchValue === title)) continue;
+    used.add(hit.name);
+    images.push({ matchType: "event", matchValue: title, file: hit.name, textInImage: false, useUntil: null, id: hit.id, url: `/api/image/${hit.id}` });
+  }
+
   for (const rule of data.images) {
     const id = files.get(rule.file);
     if (!id) {
       problems.push(`TV images: "${rule.file}" (for ${rule.matchValue}) isn't in the image folder, skipped`);
       continue;
     }
+    used.add(rule.file);
     images.push({ ...rule, id, url: `/api/image/${id}` });
   }
+  const unmatchedImages = [...files.keys()].filter((n) => !used.has(n)).sort();
   const now = new Date().toISOString();
-  return { data: { ...data, images }, updatedAt: now, checkedAt: now, lastError: null, problems, source: sourceKind() };
+  return { data: { ...data, images }, updatedAt: now, checkedAt: now, lastError: null, problems, unmatchedImages, source: sourceKind() };
 }
 
 let inflight: Promise<Snapshot> | null = null;

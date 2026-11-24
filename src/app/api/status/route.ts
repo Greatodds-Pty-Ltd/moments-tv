@@ -26,6 +26,8 @@ export async function GET(req: Request) {
         calendarRefreshed: refreshed,
         calendarStale: ageDays === null || ageDays > CALENDAR_STALE_DAYS,
         problems: s.problems,
+        // files in the image folder whose name doesn't match any Event in column C (e.g. a typo, or a past event)
+        unmatchedImages: s.unmatchedImages ?? [],
       },
       { headers: { "Cache-Control": "no-store" } },
     );

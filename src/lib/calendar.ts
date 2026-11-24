@@ -91,6 +91,8 @@ export class FatalSheetError extends Error {}
 export interface NormalizeResult {
   data: TvData;
   problems: string[];
+  /** Event (column C) → TV title, for matching image files named after the event. Server-side only. */
+  eventNames: { event: string; title: string }[];
 }
 
 /** Turns the master's tabs into TV data. Throws FatalSheetError when a tab is unusable. */
@@ -105,7 +107,7 @@ export function normalize(tabs: MasterTabs): NormalizeResult {
 
   const campaigns = buildCampaigns(briefs, cal.links);
   const images = tabs.images ? parseImages(readTab(MASTER_TABS.images, tabs.images), problems) : [];
-  return { data: { events: cal.events, campaigns, images, settings: cal.settings }, problems };
+  return { data: { events: cal.events, campaigns, images, settings: cal.settings }, problems, eventNames: cal.eventNames };
 }
 
 // ---------- calendar ----------
@@ -157,6 +159,7 @@ function parseCalendar(grid: Cell[][], briefIds: Set<string>, problems: string[]
 
   const events: TvEvent[] = [];
   const links: Link[] = [];
+  const eventNames: { event: string; title: string }[] = [];
   let week1: string | null = null;
   const refreshed = refreshedDate(grid.slice(0, hi).flat());
 
@@ -197,9 +200,10 @@ function parseCalendar(grid: Cell[][], briefIds: Set<string>, problems: string[]
       events.push({ start: o.start, end: o.end, time: o.time, title, sport, priority, toConfirm, detail, campaignId: known[0] ?? null });
     }
     if (known.length && priority !== "X") links.push({ ids: known, priority, occ, title });
+    eventNames.push({ event, title });
   });
 
-  return { events, links, settings: { week1Start: week1, refreshed } as TvSettings };
+  return { events, links, eventNames, settings: { week1Start: week1, refreshed } as TvSettings };
 }
 
 interface Occurrence {
@@ -258,6 +262,22 @@ export function week1From(week: string, refreshed: string | null): string | null
 
 function isoOf(y: number, m: number, d: number): string {
   return new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+}
+
+/**
+ * Key for matching an image file to an Event (column C): "Black Friday.png" ↔ "Black Friday".
+ * Ignores the extension, case, extra spaces, and dash/apostrophe styles (– vs -, ’ vs ').
+ */
+export function imageKey(name: string): string {
+  return name
+    .normalize("NFC")
+    .replace(/\.(jpe?g|png|webp)$/i, "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 // ---------- briefs ----------

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FatalSheetError, normalize, parseCsv, parseCsvRows, parseTvDates, toIsoDate, toTime, week1From, type Cell, type MasterTabs } from "../src/lib/calendar";
+import { FatalSheetError, imageKey, normalize, parseCsv, parseCsvRows, parseTvDates, toIsoDate, toTime, week1From, type Cell, type MasterTabs } from "../src/lib/calendar";
 
 const dir = join(__dirname, "..", "sheet-template");
 const read = (f: string) => readFileSync(join(dir, f), "utf8");
@@ -147,5 +147,22 @@ describe("values", () => {
       images: { headers: ["match_type", "match_value", "image_file"], rows: [["sport", "Golf", ""], ["Sport", "Rugby", "assets/hero/rugby.jpg"]] },
     });
     expect(data.images).toEqual([{ matchType: "sport", matchValue: "Rugby", file: "rugby.jpg", textInImage: false, useUntil: null }]);
+  });
+});
+
+describe("images named after the Event (column C)", () => {
+  it("matches the file name to the event, ignoring extension, case, spacing and dash/apostrophe styles", () => {
+    expect(imageKey("Black Friday.png")).toBe(imageKey("Black Friday"));
+    expect(imageKey("black  friday.JPG")).toBe(imageKey("Black Friday"));
+    expect(imageKey("Proteas v England, 1st Test, Wanderers.webp")).toBe(imageKey("Proteas v England, 1st Test, Wanderers"));
+    expect(imageKey("Investec Champions Cup pool rounds 2-4.jpg")).toBe(imageKey("Investec Champions Cup pool rounds 2–4"));
+    expect(imageKey("L’Ormarins King’s Plate, Kenilworth.png")).toBe(imageKey("L'Ormarins King's Plate, Kenilworth"));
+    expect(imageKey("Black Friday sale.png")).not.toBe(imageKey("Black Friday"));
+  });
+
+  it("returns each row's Event alongside its TV title", () => {
+    const { eventNames } = normalize(master());
+    expect(eventNames).toContainEqual({ event: "Black Friday", title: "Black Friday" });
+    expect(eventNames).toContainEqual({ event: "Nations Championship finals weekend, Twickenham", title: "France v Springboks" });
   });
 });
