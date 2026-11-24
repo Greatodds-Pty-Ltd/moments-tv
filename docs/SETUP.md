@@ -2,21 +2,20 @@
 
 Each step says who does it. Nothing here needs a code change.
 
-## 1. Google Sheet (Brad / planners)
-1. In the Sportingbet shared drive (per the 19 Drive Filing Map, not My Drive), create a Google Sheet **Moments TV feed** with tabs **Events**, **Campaigns**, **Images**, **Settings**.
-2. Import `sheet-template/events.csv`, `campaigns.csv`, `images.csv`, `settings.csv` into the matching tabs.
-3. Replace the Events tab with an IMPORTRANGE/QUERY view of the weekly master calendar that pulls **only** the nine Events columns. Any other column makes the TV refuse the update (and keep its last good data).
-4. Note the sheet ID (the long string in its URL).
+## 1. The sheet (done)
+The TV reads the master **Moments Campaign Calendar – Rolling 12 Weeks** directly (ID `1jqLH0dcku4oGBOBMD-9Binniv7Sh7kUEdW4cEhX3VuQ`); there is no separate feed sheet. Claude added the `TV dates`, `TV title` and `TV detail` columns (N–P on the Calendar tab) on 24 Nov 2026 and fills them on every refresh. Nothing to build here.
+
+- The workbook is in a Sportingbet shared drive (checked 24 Nov 2026), so it survives staff changes.
 
 ## 2. Image folder (marketing)
-1. In the same shared drive, create a folder **Moments TV images**. Upload `sheet-template/images/rugby-ireland-v-springboks.jpg` (until 21 Nov) and new sport images made with `docs/image-prompt.md`.
-2. Fill `image_file` on the Images tab with the exact file name. Check every image for crests, logos or garbled text first.
+1. In the same shared drive, create a folder **Moments TV images**. Upload sport images made with `docs/image-prompt.md`.
+2. Add a **TV images** tab to the master (columns `match_type, match_value, image_file, text_in_image, use_until, notes`; copy `sheet-template/tv-images.csv`) and fill `image_file` with the exact file name. Check every image for crests, logos or garbled text first.
 3. Note the folder ID (the string at the end of its URL).
 
 ## 3. Service account (Brad / IT, Google Cloud)
 1. In the Sportingbet-owned GCP project, enable **Google Sheets API** and **Google Drive API**.
 2. Create a service account `moments-tv-reader` with **no project roles**, and create a JSON key.
-3. Share the sheet and the image folder with the service account email as **Viewer**. Do not use "Publish to web".
+3. Share the master calendar and the image folder with the service account email as **Viewer**. Do not use "Publish to web".
 4. ⚠️ Before this step, confirm whether a new service account or cloud hosting needs Entain IT/infosec sign-off under the GSA (Sportingbet-OS file 15).
 
 ## 4. GitHub + Vercel (Brad)
@@ -32,8 +31,9 @@ Each step says who does it. Nothing here needs a code change.
 3. The session lasts 30 days and rolls forward while the TV is on. If it is ever signed out, the screen keeps the calendar and says so at the top.
 
 ## 6. Acceptance
-- Edit a row in the sheet: it shows on the TV within ~9 minutes (`/api/status?refresh=1` forces it immediately).
-- Break a row (priority "Q"): that row disappears, everything else stays, and `/api/status` names the row.
-- Add a column such as "owner" to Events: the TV keeps the previous data and `/api/status` shows the error.
+- `/api/status` shows `"ok": true`, `"source": "google"`, `"problems": []` and today's `calendarRefreshed`.
+- Change a row's TV title in the master: it shows on the TV within ~9 minutes (`/api/status?refresh=1` forces it immediately).
+- Blank a row's TV dates: that row disappears, everything else stays, and `/api/status` names the row.
+- Rename the TV dates header: the TV keeps the previous data and `/api/status` shows the error.
 - Add an image to the folder plus an Images row: it appears for the matching sport or event.
 - Leave it running for 7 days unattended.

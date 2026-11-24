@@ -1,6 +1,6 @@
 # Moments TV
 
-Office "Moments that Matter" display, fed from a Google Sheet. Employees-only (Google sign-in).
+Office "Moments that Matter" display, read directly from the Moments Campaign Calendar (Google Sheet). Employees-only (Google sign-in).
 
 - How it works and how to change it: [CLAUDE.md](CLAUDE.md)
 - Go-live steps: [docs/SETUP.md](docs/SETUP.md)

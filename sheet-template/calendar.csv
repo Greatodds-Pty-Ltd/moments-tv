@@ -1,0 +1,70 @@
+"Moments Campaign Calendar: rolling 12 weeks, refreshed 23 Nov 2026"
+"Local copy for dev and tests: only the columns the TV reads, from the master on 24 Nov 2026 (Event and Date status abridged)."
+
+Week,Event,Sport,Job (01),Priority,Brief,Date status,TV dates,TV title,TV detail
+W1–W3,"Formula 1: Las Vegas, Qatar and Abu Dhabi Grands Prix",Motorsport,Sport leads brand,C,,Confirmed,2026-11-22 06:00; 2026-11-29; 2026-12-06,Formula 1: last three Grands Prix,"Las Vegas, Qatar, Abu Dhabi"
+W2 (23–29 Nov),"Proteas v Bangladesh, 2nd Test, Centurion",Cricket,Sport leads brand,C,,Confirmed,2026-11-23..2026-11-27,"Proteas v Bangladesh, 2nd Test",Centurion
+W2 (23–29 Nov),UEFA Champions League league phase matchday,Football,Sport leads brand,B,A4 (pre-roll),Confirmed,2026-11-24..2026-11-25,Champions League matchday,
+W2 (23–29 Nov),"Davis Cup Final 8, Bologna",Tennis,Sport leads brand,C,,Confirmed,2026-11-24..2026-11-29,Davis Cup Final 8,Bologna. Final Sun 29 Nov
+W2 (23–29 Nov),Month-end payday,Context,n/a,Context,A2,n/a,2026-11-25,Month-end payday,
+W2 (23–29 Nov),Black Friday,Commercial,Casino grows,A,A2,Confirmed,2026-11-27,Black Friday,
+W2 (23–29 Nov),"Nations Championship finals weekend, Twickenham",Rugby,Sport leads brand,A,A1,Confirmed,2026-11-29 18:40,France v Springboks,"Nations Championship final, Twickenham"
+W2–W10,CAF Champions League group stage: Orlando Pirates in Group C,Football (CAF),Sport leads brand,B,,Windows confirmed (CAF). Pirates' match days: Verify with CAF,2026-11-27..2026-11-29; 2026-12-04..2026-12-06; 2026-12-18..2026-12-20; 2027-01-08..2027-01-10; 2027-01-15..2027-01-17; 2027-01-22..2027-01-24,CAF CL: Orlando Pirates,Group C matchday window
+W2 (23–29 Nov),"Summer Cup, Turffontein",Horse racing,Sport leads brand,B,,Confirmed,2026-11-28,Summer Cup,Turffontein
+W2 (23–29 Nov),HSBC SVNS Dubai (Blitzboks),Rugby sevens,Sport leads brand,C,,Confirmed,2026-11-28..2026-11-29,SVNS Dubai: Blitzboks,
+W2 (23–29 Nov),Premier League: Arsenal v Man City; Everton v Liverpool,Football,Sport leads brand,B,,Confirmed,2026-11-29 14:00,Everton v Liverpool,Premier League. Arsenal v Man City 18:30
+W3 (30 Nov–6 Dec),Proteas v Bangladesh ODIs,Cricket,Sport leads brand,C,,Confirmed,2026-12-01; 2026-12-04; 2026-12-07,Proteas v Bangladesh ODI,"East London, Gqeberha, Newlands"
+W3 (30 Nov–6 Dec),"Nedbank Golf Challenge, Sun City",Golf,Sport leads brand,B,,Confirmed,2026-12-03..2026-12-06,Nedbank Golf Challenge,Sun City
+W3 (30 Nov–6 Dec),Premier League: Chelsea v Liverpool (Sat); Spurs v Arsenal (Sun),Football,Sport leads brand,B,,Confirmed,2026-12-05 14:30; 2026-12-06 18:30,Chelsea v Liverpool; Spurs v Arsenal,Premier League
+W3 (30 Nov–6 Dec),"HSBC SVNS Cape Town, DHL Stadium",Rugby sevens,Sport leads brand,B,,Confirmed,2026-12-05..2026-12-06,SVNS Cape Town: Blitzboks,DHL Stadium
+W3–W5,"Cape Fillies Guineas and Cape Guineas, Kenilworth",Horse racing,Sport leads brand,C,,Confirmed,2026-12-05; 2026-12-16,Cape Guineas races,"Kenilworth. Fillies Guineas 5 Dec, Cape Guineas 16 Dec"
+W3–W4,Carling Knockout final,Football (PSL),Sport leads brand,A,A5,Verify with PSL,2026-12-12,Carling Knockout final,Venue and kick-off TBC
+W4 (7–13 Dec),UEFA Champions League league phase matchday,Football,Sport leads brand,B,A4 (pre-roll),Confirmed,2026-12-08..2026-12-09,Champions League matchday,
+W4 (7–13 Dec),Proteas Women v India,Cricket,Sport leads brand,C,,Confirmed,2026-12-09; 2026-12-12; 2026-12-15; 2026-12-20..2026-12-23,Proteas Women v India,"ODIs, then the Test in Gqeberha"
+W4 (7–13 Dec),Proteas v Bangladesh T20Is,Cricket,Sport leads brand,C,,Confirmed,2026-12-10; 2026-12-12; 2026-12-13,Proteas v Bangladesh T20I,"Kimberley, Benoni, Centurion"
+W4 (7–13 Dec),AfrAsia Bank Mauritius Open,Golf,Sport leads brand,C,,Confirmed,2026-12-10..2026-12-13,AfrAsia Bank Mauritius Open,
+W4 (7–13 Dec),"Alfred Dunhill Championship, Durban Country Club",Golf,Sport leads brand,C,,Confirmed,2027-02-25..2027-02-28,Alfred Dunhill Championship,Durban Country Club
+W4–W7,"PDC World Darts Championship, Alexandra Palace",Darts,Sport leads brand,C,,Confirmed,2026-12-11..2026-12-23; 2026-12-28..2027-01-03,PDC World Darts Championship,Alexandra Palace
+W4 (7–13 Dec),"Boxing: Tyson Fury v Anthony Joshua, Cardiff",Boxing,Sport leads brand,B,,Date confirmed. Ring-walk time: Verify with the promoter,2026-12-11,Fury v Joshua,Cardiff. Ring-walk about 03:00 SAST Sat 12 Dec
+W4–W9,Investec Champions Cup pool rounds 2–4,Rugby,Sport leads brand,B,,Confirmed,2026-12-12..2026-12-13; 2027-01-09..2027-01-10; 2027-01-15..2027-01-16,Champions Cup: SA franchises,"Stormers, Bulls and Lions"
+W4 (7–13 Dec),"FIFA Challenger Cup, Doha: Mamelodi Sundowns",Football,Sport leads brand,B,,Confirmed,2026-12-12 19:00; 2026-12-16 18:00,Sundowns at the FIFA Challenger Cup,Doha. Intercontinental Cup final v PSG on 16 Dec if they win
+W4 (7–13 Dec),Premier League: Man City v Chelsea,Football,Sport leads brand,B,,Confirmed,2026-12-12 19:30,Man City v Chelsea,Premier League
+W4 (7–13 Dec),"UFC 335, Las Vegas",MMA,Sport leads brand,C,,Confirmed (date). Start time: Verify with ufc.com,2026-12-13,UFC 335: Oliveira v Lopes,Early Sunday SAST
+W5 (14–20 Dec),Carabao Cup quarter-finals,Football,Sport leads brand,C,,Liverpool tie confirmed. Other three ties: Verify with efl.com,2026-12-16 22:00,Carabao Cup quarter-finals,Liverpool v Bournemouth
+W5 (14–20 Dec),Day of Reconciliation (public holiday),Context,n/a,Context,"A3, A4",n/a,2026-12-16,Day of Reconciliation,Public holiday
+W5 (14–20 Dec),"Proteas v England, 1st Test, Wanderers",Cricket,Sport leads brand,A,A3,Confirmed,2026-12-17..2026-12-21,"Proteas v England, 1st Test",Wanderers
+W5 (14–20 Dec),Premier League: Liverpool v Spurs (Sat); Arsenal v Man Utd (Sun),Football,Sport leads brand,B,,Confirmed,2026-12-19 19:30; 2026-12-20 18:30,Liverpool v Spurs; Arsenal v Man Utd,Premier League
+W5–W8,URC festive SA derby rounds,Rugby,Sport leads brand,B,,Dates confirmed. Kick-offs: Verify with URC,2026-12-05; 2026-12-19; 2027-01-02..2027-01-03,URC SA derbies,
+W6 (21–27 Dec),NBA Christmas Day: five games,Basketball,Sport leads brand,B,,Confirmed,2026-12-25 19:00,NBA Christmas Day,"Five games, last tip-off 05:30 Sat"
+W6 (21–27 Dec),Boxing Day: Premier League (7 matches),Football,Sport leads brand,A,A4,Confirmed,2026-12-26,Boxing Day Premier League,"Seven matches, incl. Hull v Liverpool 19:30"
+W6 (21–27 Dec),"Proteas v England, 2nd (Boxing Day) Test, Centurion",Cricket,Sport leads brand,A,A3,Confirmed,2026-12-26..2026-12-30,"Proteas v England, Boxing Day Test",Centurion
+W6 (21–27 Dec),"Premier League: Man Utd v Forest, Palace v Arsenal, Coventry v Chelsea",Football,Sport leads brand,A,A4,Confirmed,2026-12-27,Palace v Arsenal; Man Utd v Forest,Premier League. Also Coventry v Chelsea
+W7 (28 Dec–3 Jan),Premier League midweek round,Football,Sport leads brand,A,A4,Confirmed,2026-12-29..2026-12-30,Premier League midweek round,"Villa v Liverpool 30 Dec, 22:15"
+W7 (28 Dec–3 Jan),Premier League New Year round,Football,Sport leads brand,A,A4,Confirmed,2027-01-01..2027-01-03,Premier League New Year round,
+W7–W8,"United Cup, Perth and Sydney",Tennis,Sport leads brand,C,,Confirmed,2027-01-01..2027-01-10,United Cup,Perth and Sydney
+W7 (28 Dec–3 Jan),"L'Ormarins King's Plate, Kenilworth",Horse racing,Sport leads brand,C,,Confirmed,2027-01-09,L'Ormarins King's Plate,Kenilworth
+W7–W8,"Proteas v England, 3rd (New Year) Test, Newlands",Cricket,Sport leads brand,A,A3,Confirmed,2027-01-03..2027-01-07,"Proteas v England, New Year Test",Newlands
+W8 (4–10 Jan),Premier League round,Football,Sport leads brand,A,A4,Confirmed,2027-01-05..2027-01-07,Premier League round,
+W8 (4–10 Jan),"Sundowns v Orlando Pirates, Betway Premiership",Football (PSL),Sport leads brand,B,,Confirmed,2027-01-05 19:30,Sundowns v Orlando Pirates,Loftus
+W8 (4–10 Jan),FA Cup third round,Football,Sport leads brand,B,,Confirmed,2027-01-09,FA Cup third round,
+W8 (4–10 Jan),"Proteas v England, 1st ODI, Paarl",Cricket,Sport leads brand,B,A3 (tail),Confirmed,2027-01-10,"Proteas v England, 1st ODI",Paarl
+W9 (11–17 Jan),"Proteas v England, 2nd and 3rd ODIs, Bloemfontein",Cricket,Sport leads brand,B,,Confirmed,2027-01-13 13:30; 2027-01-15 10:00,Proteas v England ODI,Bloemfontein
+W9–W11,NFL play-offs,American football,Sport leads brand,C,,Confirmed,2027-01-16..2027-01-18; 2027-01-23..2027-01-24; 2027-01-31,NFL play-offs,
+Just after window,SA20 Season 5,Cricket,Sport leads brand,B (prep),,Confirmed,2027-01-17 15:30..2027-02-21,SA20 Season 5,"Opener in Gqeberha, final 21 Feb at Newlands"
+W9–W11,"Australian Open, Melbourne",Tennis,Sport leads brand,B,,Confirmed,2027-01-17..2027-01-31,Australian Open,Melbourne
+W10 (18–24 Jan),UEFA Champions League league phase matchday 7,Football,Sport leads brand,B,,Confirmed,2027-01-19..2027-01-20,Champions League matchday 7,"Inter v Liverpool, Man Utd v Bayern"
+W10 (18–24 Jan),Premier League: Man Utd v Liverpool,Football,Sport leads brand,B,,Confirmed,2027-01-24 18:30,Man Utd v Liverpool,Premier League
+W11 (25–31 Jan),UEFA Champions League final league-phase matchday,Football,Sport leads brand,B,,Confirmed,2027-01-27 22:00,Champions League final matchday,All 18 matches kick off together
+W11 (25–31 Jan),Nedbank Cup begins (last 32),Football (PSL),Sport leads brand,B,,Start date confirmed. Fixtures: Verify with PSL,2027-01-27,Nedbank Cup last 32 begins,
+W11 (25–31 Jan),Premier League: Liverpool v Everton,Football,Sport leads brand,B,,Confirmed,2027-01-30 14:30,Liverpool v Everton,Premier League
+W11 (25–31 Jan),Premier League: Man City v Arsenal,Football,Sport leads brand,B,,Confirmed,2027-01-31 18:30,Man City v Arsenal,Premier League
+W11 (25–31 Jan),"Cape Town Met, Kenilworth",Horse racing,Sport leads brand,C,,Confirmed,2027-01-30,Cape Town Met,Kenilworth
+W11 (25–31 Jan),"UFC 336, Toronto",MMA,Sport leads brand,C,,Confirmed,2027-01-31,UFC 336: two title bouts,Toronto. Early Sunday SAST
+W12 (1–7 Feb),"Spanish Super Cup, Istanbul",Football,Sport leads brand,C,,Confirmed,2027-02-02..2027-02-03; 2027-02-06,Spanish Super Cup,Istanbul
+W12 (1–7 Feb),Six Nations round 1,Rugby,Sport leads brand,C,,Confirmed,2027-02-05 22:10; 2027-02-06,Six Nations round 1,
+W12 (1–7 Feb),Davis Cup World Group II play-off: North Macedonia v South Africa,Tennis,Sport leads brand,C,,Verify with ITF or Tennis SA,2027-02-05..2027-02-07,Davis Cup play-off: SA away,v North Macedonia. Exact days TBC
+W12 (1–7 Feb),"Mamelodi Sundowns v Kaizer Chiefs, Loftus",Football (PSL),Sport leads brand,B,,Confirmed,2027-02-06 15:30,Sundowns v Kaizer Chiefs,Loftus
+W12–W13,"Premier League: Arsenal v Liverpool, Man Utd v Chelsea; Spurs v Man City",Football,Sport leads brand,B,,Verify with premierleague.com,2027-02-06; 2027-02-10 22:00,Big Premier League week,"Arsenal v Liverpool, Man Utd v Chelsea (6 Feb); Spurs v Man City (10 Feb)"
+W13 (8–14 Feb),FA Cup fourth round,Football,Sport leads brand,B,,Confirmed,2027-02-13,FA Cup fourth round,
+W13 (8–14 Feb),Six Nations round 2,Rugby,Sport leads brand,C,,Confirmed,2027-02-13..2027-02-14,Six Nations round 2,
+W13 (8–14 Feb),"Super Bowl LXI, Inglewood",American football,Sport leads brand,C,,Confirmed (date and venue). Kick-off: Verify with nfl.com,2027-02-15,Super Bowl LXI,Early Monday SAST

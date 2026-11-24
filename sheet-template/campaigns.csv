@@ -1,9 +1,0 @@
-campaign_id,name,message,seg_start,seg_end,seg_label,main_window
-A1,Boks November finale,"Every Bok moment, amplified: the last two tests of the year",2026-11-21,2026-11-21,Ireland,TRUE
-A1,Boks November finale,"Every Bok moment, amplified: the last two tests of the year",2026-11-27,2026-11-29,Finals,TRUE
-A2,Black Friday,Our best week of the year for existing players,2026-11-26,2026-11-29,Thu–Sun,TRUE
-A3,Proteas v England Tests,"Every session of England at the Wanderers, Centurion and Newlands",2026-12-17,2027-01-07,Three Tests,TRUE
-A3,Proteas v England Tests,"Every session of England at the Wanderers, Centurion and Newlands",2027-01-08,2027-01-10,ODI tail,FALSE
-A4,Festive football,"Boxing Day to the New Year: more football, more ways to back it",2026-11-24,2026-11-25,Pre-roll,FALSE
-A4,Festive football,"Boxing Day to the New Year: more football, more ways to back it",2026-12-08,2026-12-09,,FALSE
-A4,Festive football,"Boxing Day to the New Year: more football, more ways to back it",2026-12-26,2027-01-07,Main burst,TRUE

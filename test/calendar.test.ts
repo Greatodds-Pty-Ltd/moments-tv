@@ -1,98 +1,138 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FatalSheetError, normalize, parseCsv, toIsoDate, toTime, type RawTab, type RawTabs } from "../src/lib/calendar";
+import { FatalSheetError, normalize, parseCsv, parseCsvRows, parseTvDates, toIsoDate, toTime, week1From, type Cell, type MasterTabs } from "../src/lib/calendar";
 
 const dir = join(__dirname, "..", "sheet-template");
-const csv = (f: string) => parseCsv(readFileSync(join(dir, f), "utf8"));
-const templates = (): RawTabs => ({
-  Events: csv("events.csv"),
-  Campaigns: csv("campaigns.csv"),
-  Images: csv("images.csv"),
-  Settings: csv("settings.csv"),
+const read = (f: string) => readFileSync(join(dir, f), "utf8");
+const master = (): MasterTabs => ({
+  calendar: parseCsvRows(read("calendar.csv")),
+  briefs: parseCsvRows(read("briefs.csv")),
+  images: parseCsv(read("tv-images.csv")),
 });
 
-const EV_HEAD = ["start_date", "end_date", "time_sast", "title", "sport", "priority", "to_confirm", "detail", "campaign_id"];
-const CAMP_HEAD = ["campaign_id", "name", "message", "seg_start", "seg_end", "seg_label", "main_window"];
-const camps = (): RawTab => ({ headers: CAMP_HEAD, rows: [["A1", "Boks", "msg", "2026-11-21", "2026-11-21", "Ireland", "TRUE"]] });
-const good = ["2026-11-21", "2026-11-21", "18:40", "Ireland v Springboks", "Rugby", "A", "FALSE", "Dublin", "A1"];
+const HEAD = ["Week", "Dates", "Event", "Sport", "Why it matters to our FANs", "Job (01)", "Priority", "Brief", "Date status", "Source", "ACQUISITON OPPORTUNITY", "TV dates", "TV title", "TV detail"];
+const BRIEFS: Cell[][] = [["Priority A briefs"], ["Field", "A1: Boks November finale", "A2: Black Friday"], ["Single-minded message", "Every Bok moment", "Best week"], ["Offer (04 only)", "SECRET OFFER", "SECRET OFFER"]];
+const row = (o: Partial<Record<string, Cell>>): Cell[] =>
+  HEAD.map((h) => o[h] ?? (h === "Why it matters to our FANs" ? "private reasoning" : h === "ACQUISITON OPPORTUNITY" ? "private plan" : ""));
+const boks = row({ Week: "W2 (23–29 Nov)", Event: "Nations final", Sport: "Rugby", Priority: "A", Brief: "A1", "Date status": "Confirmed", "TV dates": "2026-11-29 18:40", "TV title": "France v Springboks" });
+const cal = (...rows: Cell[][]): Cell[][] => [["Moments Campaign Calendar: rolling 12 weeks, refreshed 23 Nov 2026"], [], [], HEAD, boks, ...rows];
+const run = (...rows: Cell[][]) => normalize({ calendar: cal(...rows), briefs: BRIEFS });
 
-describe("templates", () => {
-  it("load cleanly with no problems", () => {
-    const { data, problems } = normalize(templates());
+describe("the local copy of the master", () => {
+  it("loads cleanly with no problems", () => {
+    const { data, problems } = normalize(master());
     expect(problems).toEqual([]);
-    expect(data.events).toHaveLength(75);
-    expect(data.campaigns.map((c) => c.id)).toEqual(["A1", "A2", "A3", "A4"]);
-    expect(data.campaigns[3].segments).toHaveLength(3);
-    expect(data.images).toEqual([
-      {
-        matchType: "event",
-        matchValue: "Ireland v Springboks",
-        file: "rugby-ireland-v-springboks.jpg",
-        textInImage: true,
-        useUntil: "2026-11-21",
-      },
-    ]);
-    expect(data.settings.week1Start).toBe("2026-11-16");
+    expect(data.events.length).toBeGreaterThan(66); // multi-date rows expand
+    expect(data.campaigns.map((c) => c.id)).toEqual(["A1", "A2", "A3", "A4", "A5"]);
+    expect(data.settings).toEqual({ week1Start: "2026-11-16", refreshed: "2026-11-23" });
   });
 
-  it("keep quoted commas and the Boks row intact", () => {
-    const ev = normalize(templates()).data.events.find((e) => e.title === "Ireland v Springboks")!;
-    expect(ev).toEqual({
-      start: "2026-11-21",
-      end: "2026-11-21",
+  it("builds campaign windows from the linked calendar rows", () => {
+    const { campaigns } = normalize(master()).data;
+    const a3 = campaigns.find((c) => c.id === "A3")!;
+    expect(a3.message).toMatch(/^The summer's biggest series/);
+    expect(a3.segments).toEqual([
+      { start: "2026-12-17", end: "2026-12-21", main: true, label: "" },
+      { start: "2026-12-26", end: "2026-12-30", main: true, label: "" },
+      { start: "2027-01-03", end: "2027-01-07", main: true, label: "" },
+      { start: "2027-01-10", end: "2027-01-10", main: false, label: "Tail" },
+    ]);
+    const a4 = campaigns.find((c) => c.id === "A4")!;
+    expect(a4.segments.slice(0, 2).map((s) => s.label)).toEqual(["Pre-roll", "Pre-roll"]);
+    // context rows (payday, public holiday) never become campaign windows
+    expect(campaigns.find((c) => c.id === "A2")!.segments).toEqual([{ start: "2026-11-27", end: "2026-11-27", main: true, label: "" }]);
+  });
+
+  it("maps the master's columns onto TV events", () => {
+    const evs = normalize(master()).data.events;
+    expect(evs.find((e) => e.title === "France v Springboks")).toEqual({
+      start: "2026-11-29",
+      end: "2026-11-29",
       time: "18:40",
-      title: "Ireland v Springboks",
+      title: "France v Springboks",
       sport: "Rugby",
       priority: "A",
       toConfirm: false,
-      detail: "Aviva Stadium, Dublin. Last Bok pool test of 2026",
+      detail: "Nations Championship final, Twickenham",
       campaignId: "A1",
     });
+    expect(evs.find((e) => e.title === "Carling Knockout final")).toMatchObject({ sport: "Football", toConfirm: true, campaignId: "A5" });
+    expect(evs.find((e) => e.title === "Black Friday")!.sport).toBe("Casino");
+    expect(evs.find((e) => e.title === "Month-end payday")!.priority).toBe("X");
+    expect(evs.find((e) => e.title === "SA20 Season 5")).toMatchObject({ start: "2027-01-17", end: "2027-02-21", time: "15:30", priority: "B" });
+    expect(evs.filter((e) => e.title === "CAF CL: Orlando Pirates")).toHaveLength(6);
   });
 });
 
-describe("bad rows are dropped, not fatal", () => {
-  const run = (...rows: unknown[][]) =>
-    normalize({ Events: { headers: EV_HEAD, rows: [good, ...(rows as string[][])] }, Campaigns: camps() });
+describe("only the TV columns are read", () => {
+  it("never copies other columns or brief fields into the data", () => {
+    const json = JSON.stringify(run().data);
+    expect(json).not.toMatch(/private|SECRET/);
+  });
+});
 
-  it("drops an unknown priority", () => {
-    const r = run(["2026-11-22", "", "", "Bad", "Rugby", "Z", "", "", ""]);
+describe("bad rows are dropped and named", () => {
+  it("flags a row with no TV dates", () => {
+    const r = run(row({ Event: "Forgotten", Priority: "B" }));
     expect(r.data.events).toHaveLength(1);
-    expect(r.problems[0]).toMatch(/row 3 \(Bad\).*priority "Z"/);
+    expect(r.problems).toEqual(["Calendar row 6 (Forgotten): no TV dates, not shown on the TV"]);
   });
 
-  it("drops end before start", () => {
-    const r = run(["2026-11-22", "2026-11-20", "", "Backwards", "Rugby", "B", "", "", ""]);
-    expect(r.data.events).toHaveLength(1);
-    expect(r.problems[0]).toMatch(/end_date is before start_date/);
+  it("drops an unknown priority and a bad date entry, keeps the good entries", () => {
+    const r = run(
+      row({ Event: "Bad", Priority: "Z", "TV dates": "2026-11-30" }),
+      row({ Event: "Half", Priority: "C", "TV dates": "2026-12-01; 1 Dec; 2026-02-30; 2026-12-05..2026-12-04" }),
+    );
+    expect(r.data.events.map((e) => e.title)).toEqual(["France v Springboks", "Half"]);
+    expect(r.problems).toHaveLength(4);
+    expect(r.problems[0]).toMatch(/row 6 \(Bad\).*priority "Z"/);
   });
 
-  it("drops unparseable and impossible dates", () => {
-    const r = run(["22/11/2026", "", "", "Slashes", "Rugby", "B", "", "", ""], ["2026-02-30", "", "", "Feb 30", "Rugby", "B", "", "", ""]);
-    expect(r.data.events).toHaveLength(1);
-    expect(r.problems).toHaveLength(2);
-  });
-
-  it("keeps an event with a bad time, minus the time", () => {
-    const r = run(["2026-11-22", "", "TBC", "No time", "Rugby", "B", "", "", ""]);
-    expect(r.data.events[1].time).toBeNull();
-    expect(r.problems[0]).toMatch(/time_sast "TBC"/);
-  });
-
-  it("unlinks an unknown campaign and skips blank rows silently", () => {
-    const r = run(["2026-11-22", "", "", "Orphan", "Rugby", "A", "", "", "Z9"], ["", "", "", "", "", "", "", "", ""]);
+  it("ignores a brief id that isn't on the briefs tab", () => {
+    const r = run(row({ Event: "Orphan", Priority: "A", Brief: "A9", "TV dates": "2026-12-01" }));
     expect(r.data.events[1].campaignId).toBeNull();
-    expect(r.problems).toHaveLength(1);
-  });
-
-  it("defaults end to start and lower-case priority is accepted", () => {
-    const r = run(["2026-11-22", "", "", "One day", "Golf", "b", "yes", "", ""]);
-    expect(r.data.events[1]).toMatchObject({ end: "2026-11-22", priority: "B", toConfirm: true });
+    expect(r.problems[0]).toMatch(/brief A9 isn't on the Priority A briefs tab/);
   });
 });
 
-describe("Google Sheets cell types", () => {
+describe("bad tabs are fatal (keep last good data)", () => {
+  it("rejects missing tabs, a missing TV dates column and a calendar with nothing to show", () => {
+    expect(() => normalize({ briefs: BRIEFS })).toThrow(/Calendar tab is missing/);
+    expect(() => normalize({ calendar: cal() })).toThrow(/Priority A briefs tab is missing/);
+    const noTv = cal().map((r) => r.slice(0, 11));
+    expect(() => normalize({ calendar: noTv, briefs: BRIEFS })).toThrow(/missing column\(s\): tv dates/);
+    expect(() => normalize({ calendar: [["#REF!"]], briefs: BRIEFS })).toThrow(FatalSheetError);
+    expect(() => normalize({ calendar: [HEAD, row({ Event: "x", Priority: "A" })], briefs: BRIEFS })).toThrow(/no rows the TV can show/);
+  });
+
+  it("rejects an unexpected column on the TV images tab", () => {
+    expect(() =>
+      normalize({ calendar: cal(), briefs: BRIEFS, images: { headers: ["match_type", "match_value", "image_file", "owner"], rows: [] } }),
+    ).toThrow(/unexpected column: "owner"/);
+  });
+});
+
+describe("values", () => {
+  it("parses TV dates", () => {
+    const p: string[] = [];
+    expect(parseTvDates("2026-11-29 18:40; 2026-12-01..2026-12-03\n2027-01-17 15:30..2027-02-21", "x", p)).toEqual([
+      { start: "2026-11-29", end: "2026-11-29", time: "18:40" },
+      { start: "2026-12-01", end: "2026-12-03", time: null },
+      { start: "2027-01-17", end: "2027-02-21", time: "15:30" },
+    ]);
+    expect(parseTvDates(46347, "x", p)).toEqual([{ start: "2026-11-21", end: "2026-11-21", time: null }]);
+    expect(parseTvDates("2026-11-29 25:00", "x", p)).toEqual([]);
+    expect(p).toHaveLength(1);
+  });
+
+  it("works out W1 from the Week column, across the year end", () => {
+    expect(week1From("W2 (23–29 Nov)", "2026-11-23")).toBe("2026-11-16");
+    expect(week1From("W7 (28 Dec–3 Jan)", "2026-11-23")).toBe("2026-11-16");
+    expect(week1From("W2 (4–10 Jan)", "2026-12-30")).toBe("2026-12-28");
+    expect(week1From("W1–W3", "2026-11-23")).toBeNull();
+  });
+
   it("reads date serials and time fractions", () => {
     expect(toIsoDate(46347)).toBe("2026-11-21");
     expect(toTime(18 / 24 + 40 / 1440)).toBe("18:40");
@@ -100,61 +140,12 @@ describe("Google Sheets cell types", () => {
     expect(toTime("25:00")).toBeNull();
   });
 
-  it("reads native booleans", () => {
-    const { data } = normalize({
-      Events: { headers: EV_HEAD, rows: [[46347, null, 0.7777777, "Serial", "Rugby", "A", true, null, "A1"]] },
-      Campaigns: camps(),
-    });
-    expect(data.events[0]).toMatchObject({ start: "2026-11-21", end: "2026-11-21", time: "18:40", toConfirm: true });
-  });
-});
-
-describe("bad tabs are fatal (keep last good data)", () => {
-  it("rejects a column that isn't TV-safe", () => {
-    expect(() =>
-      normalize({ Events: { headers: [...EV_HEAD, "Owner"], rows: [[...good, "Brad"]] }, Campaigns: camps() }),
-    ).toThrow(/isn't on the TV-safe list: "Owner"/);
-  });
-
-  it("rejects data under a blank header but allows empty trailing columns", () => {
-    expect(() =>
-      normalize({ Events: { headers: [...EV_HEAD, ""], rows: [[...good, "secret note"]] }, Campaigns: camps() }),
-    ).toThrow(FatalSheetError);
-    expect(normalize({ Events: { headers: [...EV_HEAD, ""], rows: [[...good, ""]] }, Campaigns: camps() }).data.events).toHaveLength(1);
-  });
-
-  it("rejects a missing tab, missing column, IMPORTRANGE error and an all-bad Events tab", () => {
-    expect(() => normalize({ Events: { headers: EV_HEAD, rows: [good] } })).toThrow(/Campaigns tab is missing/);
-    expect(() => normalize({ Events: { headers: EV_HEAD.slice(1), rows: [] }, Campaigns: camps() })).toThrow(/start_date/);
-    expect(() => normalize({ Events: { headers: ["#REF!"], rows: [] }, Campaigns: camps() })).toThrow(FatalSheetError);
-    expect(() =>
-      normalize({ Events: { headers: EV_HEAD, rows: [["x", "", "", "Bad", "", "A", "", "", ""]] }, Campaigns: camps() }),
-    ).toThrow(/no valid rows/);
-  });
-});
-
-describe("images and settings", () => {
   it("skips placeholder image rows and strips folders from file names", () => {
     const { data } = normalize({
-      Events: { headers: EV_HEAD, rows: [good] },
-      Campaigns: camps(),
-      Images: {
-        headers: ["match_type", "match_value", "image_file"],
-        rows: [
-          ["sport", "Golf", ""],
-          ["Sport", "Rugby", "assets/hero/rugby.jpg"],
-        ],
-      },
+      calendar: cal(),
+      briefs: BRIEFS,
+      images: { headers: ["match_type", "match_value", "image_file"], rows: [["sport", "Golf", ""], ["Sport", "Rugby", "assets/hero/rugby.jpg"]] },
     });
     expect(data.images).toEqual([{ matchType: "sport", matchValue: "Rugby", file: "rugby.jpg", textInImage: false, useUntil: null }]);
-  });
-
-  it("snaps week1_start to its Monday", () => {
-    const { data } = normalize({
-      Events: { headers: EV_HEAD, rows: [good] },
-      Campaigns: camps(),
-      Settings: { headers: ["key", "value"], rows: [["week1_start", "2026-11-19"]] },
-    });
-    expect(data.settings.week1Start).toBe("2026-11-16");
   });
 });

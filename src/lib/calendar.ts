@@ -1,13 +1,21 @@
-// The data contract between the Google Sheet and the TV, and the validator that
-// enforces it. Pure functions only (no I/O) so they can be unit-tested.
+// The data contract between the Moments Campaign Calendar (the master Google
+// Sheet Claude maintains) and the TV, and the validator that enforces it.
+// Pure functions only (no I/O) so they can be unit-tested.
 //
-// Rules of thumb:
-// - A bad ROW is dropped (or degraded) and reported in `problems`; the rest of
-//   the sheet still reaches the screen.
-// - A bad TAB (missing, missing a required column, or carrying a column that
-//   isn't on the TV-safe list) is fatal: the refresh fails and the TV keeps the
-//   last good data. The column allowlist is a second guard that keeps
-//   blockers, owners, offer mechanics, legal notes and customer data off the TV.
+// The TV reads the master directly, so it can never drift from it:
+// - Calendar tab: one row per moment. The TV reads ONLY these columns, by
+//   header name: Week, Event, Sport, Job, Priority, Brief, Date status, and the
+//   three TV columns Claude fills on every refresh (TV dates, TV title, TV
+//   detail). Every other column (why it matters, acquisition, retention,
+//   sources...) is never read.
+// - Priority A briefs tab: only the "Field" header row (campaign id and name)
+//   and the "Single-minded message" row. Offers, budgets and channels are never read.
+// - TV images tab (optional): which hero image goes with which event or sport.
+// - Blockers, Sources, Archive and Change log are never requested.
+//
+// A bad ROW is dropped and reported in `problems`; the rest still shows. A bad
+// TAB (missing, or missing a required column) is fatal: the refresh fails and
+// the TV keeps the last good data.
 
 export type Priority = "A" | "B" | "C" | "X";
 
@@ -46,7 +54,8 @@ export interface TvImageRule {
 }
 
 export interface TvSettings {
-  week1Start: string | null; // Monday of W1 in the 12-week grid; rolls forward when out of range
+  week1Start: string | null; // Monday of W1, from the Week column; the TV rolls forward when out of range
+  refreshed: string | null; // "refreshed <date>" in the Calendar title, as YYYY-MM-DD
 }
 
 export interface TvData {
@@ -61,36 +70,20 @@ export interface RawTab {
   headers: Cell[];
   rows: Cell[][];
 }
-export type RawTabs = Partial<Record<TabName, RawTab>>;
-export type TabName = "Events" | "Campaigns" | "Images" | "Settings";
 
-interface TabSpec {
-  required: string[];
-  optional: string[];
-  mandatoryTab: boolean;
+/** The master's tabs as raw rows. Calendar and briefs keep every row, title rows included. */
+export interface MasterTabs {
+  calendar?: Cell[][];
+  briefs?: Cell[][];
+  images?: RawTab;
 }
 
-export const TABS: Record<TabName, TabSpec> = {
-  Events: {
-    required: ["start_date", "title", "priority"],
-    optional: ["end_date", "time_sast", "sport", "to_confirm", "detail", "campaign_id"],
-    mandatoryTab: true,
-  },
-  Campaigns: {
-    required: ["campaign_id", "name", "seg_start"],
-    optional: ["message", "seg_end", "seg_label", "main_window"],
-    mandatoryTab: true,
-  },
-  Images: {
-    required: ["match_type", "match_value", "image_file"],
-    optional: ["text_in_image", "use_until", "notes"],
-    mandatoryTab: false,
-  },
-  Settings: {
-    required: ["key", "value"],
-    optional: ["notes"],
-    mandatoryTab: false,
-  },
+/** Sheet tab titles (matched case-insensitively). */
+export const MASTER_TABS = { calendar: "Calendar", briefs: "Priority A briefs", images: "TV images" } as const;
+
+const IMAGE_COLS = {
+  required: ["match_type", "match_value", "image_file"],
+  optional: ["text_in_image", "use_until", "notes"],
 };
 
 export class FatalSheetError extends Error {}
@@ -100,68 +93,244 @@ export interface NormalizeResult {
   problems: string[];
 }
 
-const PRIORITIES = new Set(["A", "B", "C", "X"]);
-
-/** Turns the raw tabs into TV data. Throws FatalSheetError when a tab is unusable. */
-export function normalize(tabs: RawTabs): NormalizeResult {
+/** Turns the master's tabs into TV data. Throws FatalSheetError when a tab is unusable. */
+export function normalize(tabs: MasterTabs): NormalizeResult {
   const problems: string[] = [];
+  if (!tabs.calendar) throw new FatalSheetError(`${MASTER_TABS.calendar} tab is missing`);
+  if (!tabs.briefs) throw new FatalSheetError(`${MASTER_TABS.briefs} tab is missing`);
 
-  const campaignsTab = readTab("Campaigns", tabs.Campaigns);
-  const campaigns = parseCampaigns(campaignsTab, problems);
-  const campaignIds = new Set(campaigns.map((c) => c.id));
+  const briefs = parseBriefs(tabs.briefs);
+  const cal = parseCalendar(tabs.calendar, new Set(briefs.keys()), problems);
+  if (cal.events.length === 0) throw new FatalSheetError("Calendar tab has no rows the TV can show");
 
-  const eventsTab = readTab("Events", tabs.Events);
-  const events = parseEvents(eventsTab, campaignIds, problems);
-  if (events.length === 0) throw new FatalSheetError("Events tab has no valid rows");
-
-  const images = tabs.Images ? parseImages(readTab("Images", tabs.Images), problems) : [];
-  const settings = tabs.Settings ? parseSettings(readTab("Settings", tabs.Settings), problems) : { week1Start: null };
-
-  return { data: { events, campaigns, images, settings }, problems };
+  const campaigns = buildCampaigns(briefs, cal.links);
+  const images = tabs.images ? parseImages(readTab(MASTER_TABS.images, tabs.images), problems) : [];
+  return { data: { events: cal.events, campaigns, images, settings: cal.settings }, problems };
 }
 
-// ---------- tabs ----------
-
-interface Row {
-  n: number; // sheet row number, for messages (header is row 1)
-  get(col: string): Cell;
-}
+// ---------- calendar ----------
 
 function headerKey(h: Cell): string {
   return String(h ?? "")
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, "_");
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
-function readTab(name: TabName, tab: RawTab | undefined): Row[] {
-  const spec = TABS[name];
-  if (!tab) {
-    if (spec.mandatoryTab) throw new FatalSheetError(`${name} tab is missing`);
-    return [];
-  }
-  const keys = tab.headers.map(headerKey);
-  const allowed = new Set([...spec.required, ...spec.optional]);
+// header key → our name; "Job (01)" → job_01, so jobs match on the prefix
+const CAL_COLUMNS: [string, (k: string) => boolean][] = [
+  ["week", (k) => k === "week"],
+  ["event", (k) => k === "event"],
+  ["sport", (k) => k === "sport"],
+  ["job", (k) => k === "job" || k.startsWith("job_")],
+  ["priority", (k) => k === "priority"],
+  ["brief", (k) => k === "brief"],
+  ["date_status", (k) => k === "date_status"],
+  ["tv_dates", (k) => k === "tv_dates"],
+  ["tv_title", (k) => k === "tv_title"],
+  ["tv_detail", (k) => k === "tv_detail"],
+];
+const CAL_REQUIRED = ["event", "priority", "tv_dates"];
 
+interface Link {
+  ids: string[];
+  priority: Priority;
+  occ: Occurrence[];
+  title: string;
+}
+
+function parseCalendar(grid: Cell[][], briefIds: Set<string>, problems: string[]) {
+  const hi = grid.slice(0, 15).findIndex((r) => {
+    const keys = r.map(headerKey);
+    return keys.includes("event") && keys.includes("priority");
+  });
+  if (hi < 0) throw new FatalSheetError("Calendar tab: no header row with Event and Priority in the first 15 rows");
+  const keys = grid[hi].map(headerKey);
+  const col = new Map<string, number>();
+  for (const [name, match] of CAL_COLUMNS) {
+    const i = keys.findIndex(match);
+    if (i >= 0) col.set(name, i);
+  }
+  const missing = CAL_REQUIRED.filter((c) => !col.has(c));
+  if (missing.length) throw new FatalSheetError(`Calendar tab is missing column(s): ${missing.map((m) => m.replace(/_/g, " ")).join(", ")}`);
+
+  const events: TvEvent[] = [];
+  const links: Link[] = [];
+  let week1: string | null = null;
+  const refreshed = refreshedDate(grid.slice(0, hi).flat());
+
+  grid.slice(hi + 1).forEach((r, i) => {
+    const n = hi + 2 + i; // sheet row number
+    const get = (c: string) => (col.has(c) ? r[col.get(c)!] : undefined);
+    const event = text(get("event"));
+    if (!event) return; // blank or spacer row
+    const title = text(get("tv_title")) || event;
+    const where = `Calendar row ${n} (${title})`;
+
+    week1 ??= week1From(text(get("week")), refreshed);
+
+    const pr = text(get("priority")).toUpperCase();
+    const priority: Priority | null = pr.startsWith("CONTEXT") ? "X" : (pr.match(/^([ABC])\b/)?.[1] as Priority | undefined) ?? null;
+    if (!priority) {
+      problems.push(`${where}: priority "${text(get("priority"))}" isn't A, B, C or Context, not shown`);
+      return;
+    }
+    const rawDates = get("tv_dates");
+    if (isBlank(rawDates)) {
+      problems.push(`${where}: no TV dates, not shown on the TV`);
+      return;
+    }
+    const occ = parseTvDates(rawDates, `${where}: TV dates`, problems);
+    if (!occ.length) return;
+
+    const ids = [...new Set(text(get("brief")).toUpperCase().match(/\bA\d+\b/g) ?? [])];
+    for (const id of ids) if (!briefIds.has(id)) problems.push(`${where}: brief ${id} isn't on the Priority A briefs tab, link ignored`);
+    const known = ids.filter((id) => briefIds.has(id));
+
+    let sport = text(get("sport")).replace(/\s*\(.*\)\s*$/, "");
+    if (/^casino/i.test(text(get("job")))) sport = "Casino";
+    const toConfirm = /\bverify\b/i.test(text(get("date_status")));
+    const detail = text(get("tv_detail"));
+
+    for (const o of occ) {
+      events.push({ start: o.start, end: o.end, time: o.time, title, sport, priority, toConfirm, detail, campaignId: known[0] ?? null });
+    }
+    if (known.length && priority !== "X") links.push({ ids: known, priority, occ, title });
+  });
+
+  return { events, links, settings: { week1Start: week1, refreshed } as TvSettings };
+}
+
+interface Occurrence {
+  start: string;
+  end: string;
+  time: string | null;
+}
+
+/** "2026-11-29 18:40", "2026-11-27..2026-11-29", "2027-01-17 15:30..2027-02-21", separated by ";" or new lines. */
+export function parseTvDates(c: Cell, label: string, problems: string[]): Occurrence[] {
+  if (typeof c === "number") {
+    const d = toIsoDate(c);
+    return d ? [{ start: d, end: d, time: null }] : [];
+  }
+  const out: Occurrence[] = [];
+  for (const part of String(c ?? "").split(/[;\n]/).map((s) => s.trim()).filter(Boolean)) {
+    const m = part.match(/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?(?:\s*\.\.\s*(\d{4}-\d{2}-\d{2}))?$/);
+    const start = m && toIsoDate(m[1]);
+    const end = m && (m[3] ? toIsoDate(m[3]) : start);
+    const time = m?.[2] ? toTime(m[2]) : null;
+    if (!m || !start || !end || end < start || (m[2] && !time)) {
+      problems.push(`${label} "${part}" isn't YYYY-MM-DD[ HH:MM][..YYYY-MM-DD], skipped`);
+      continue;
+    }
+    out.push({ start, end, time });
+  }
+  return out;
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** "…refreshed 23 Nov 2026" in the title rows. */
+function refreshedDate(cells: Cell[]): string | null {
+  for (const c of cells) {
+    const m = text(c).match(/refreshed\s+(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/i);
+    const mi = m ? MONTHS.indexOf(m[2].toLowerCase()) : -1;
+    if (m && mi >= 0) return isoOf(Number(m[3]), mi, Number(m[1]));
+  }
+  return null;
+}
+
+/** "W2 (23–29 Nov)" or "W3 (30 Nov–6 Dec)" → the Monday of W1. The year is the one nearest the refresh date. */
+export function week1From(week: string, refreshed: string | null): string | null {
+  const m = week.match(/^W(\d+)\s*\((\d{1,2})(?:\s+([A-Za-z]{3})[a-z]*)?\s*[–-]\s*\d{1,2}\s+([A-Za-z]{3})/);
+  if (!m) return null;
+  const mi = MONTHS.indexOf((m[3] ?? m[4]).toLowerCase());
+  if (mi < 0) return null;
+  const ref = refreshed ? Date.parse(refreshed) : Date.now();
+  const base = new Date(ref).getUTCFullYear();
+  const day = [base - 1, base, base + 1]
+    .map((y) => isoOf(y, mi, Number(m[2])))
+    .sort((a, b) => Math.abs(Date.parse(a) - ref) - Math.abs(Date.parse(b) - ref))[0];
+  const w1 = new Date(Date.parse(mondayOf(day)) - (Number(m[1]) - 1) * 7 * 864e5);
+  return w1.toISOString().slice(0, 10);
+}
+
+function isoOf(y: number, m: number, d: number): string {
+  return new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+}
+
+// ---------- briefs ----------
+
+/** id → {name, message}, from the "Field" row ("A1: Boks November finale") and the "Single-minded message" row only. */
+function parseBriefs(grid: Cell[][]): Map<string, { name: string; message: string }> {
+  const fieldRow = grid.find((r) => headerKey(r[0]) === "field");
+  if (!fieldRow) throw new FatalSheetError(`${MASTER_TABS.briefs} tab: no "Field" header row`);
+  const msgRow = grid.find((r) => headerKey(r[0]).startsWith("single_minded_message"));
+  const out = new Map<string, { name: string; message: string }>();
+  fieldRow.forEach((c, i) => {
+    const m = text(c).match(/^(A\d+)\s*:\s*(.+)$/i);
+    if (i > 0 && m) out.set(m[1].toUpperCase(), { name: m[2], message: msgRow ? text(msgRow[i]) : "" });
+  });
+  return out;
+}
+
+/** Campaign windows come from the calendar rows linked to each brief: Priority A rows are the main window, B/C rows pre-roll or tail. */
+function buildCampaigns(briefs: Map<string, { name: string; message: string }>, links: Link[]): TvCampaign[] {
+  const out: TvCampaign[] = [];
+  for (const [id, b] of briefs) {
+    const raw = links
+      .filter((l) => l.ids.includes(id))
+      .flatMap((l) => l.occ.map((o) => ({ start: o.start, end: o.end, main: l.priority === "A" })))
+      .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+    if (!raw.length) continue;
+    // merge overlapping or back-to-back days of the same kind
+    const segs: { start: string; end: string; main: boolean }[] = [];
+    for (const s of raw) {
+      const last = segs[segs.length - 1];
+      if (last && last.main === s.main && s.start <= addDays(last.end, 1)) {
+        if (s.end > last.end) last.end = s.end;
+      } else segs.push({ ...s });
+    }
+    const firstMain = segs.find((s) => s.main)?.start ?? null;
+    out.push({
+      id,
+      name: b.name,
+      message: b.message,
+      segments: segs.map((s) => ({
+        ...s,
+        label: s.main ? "" : firstMain && s.start < firstMain ? "Pre-roll" : "Tail",
+      })),
+    });
+  }
+  return out;
+}
+
+function addDays(iso: string, n: number): string {
+  return new Date(Date.parse(iso) + n * 864e5).toISOString().slice(0, 10);
+}
+
+// ---------- TV images tab (strict: Claude owns it, nothing else belongs there) ----------
+
+interface Row {
+  n: number;
+  get(col: string): Cell;
+}
+
+function readTab(name: string, tab: RawTab): Row[] {
+  const keys = tab.headers.map(headerKey);
+  const allowed = new Set([...IMAGE_COLS.required, ...IMAGE_COLS.optional]);
   keys.forEach((k, i) => {
     if (k === "") {
-      // A blank header is fine as long as nothing sits under it.
       if (tab.rows.some((r) => !isBlank(r[i]))) {
         throw new FatalSheetError(`${name} tab has data under a blank column header (column ${colLetter(i)})`);
       }
       return;
     }
-    if (!allowed.has(k)) {
-      throw new FatalSheetError(
-        `${name} tab has a column that isn't on the TV-safe list: "${String(tab.headers[i]).trim()}". Remove it from the TV sheet.`,
-      );
-    }
+    if (!allowed.has(k)) throw new FatalSheetError(`${name} tab has an unexpected column: "${String(tab.headers[i]).trim()}"`);
   });
-  const dupe = keys.find((k, i) => k && keys.indexOf(k) !== i);
-  if (dupe) throw new FatalSheetError(`${name} tab has the column "${dupe}" twice`);
-  const missing = spec.required.filter((k) => !keys.includes(k));
+  const missing = IMAGE_COLS.required.filter((k) => !keys.includes(k));
   if (missing.length) throw new FatalSheetError(`${name} tab is missing column(s): ${missing.join(", ")}`);
-
   const idx = new Map(keys.map((k, i) => [k, i]));
   return tab.rows
     .map((r, i) => ({ r, n: i + 2 }))
@@ -169,123 +338,12 @@ function readTab(name: TabName, tab: RawTab | undefined): Row[] {
     .map(({ r, n }) => ({ n, get: (col: string) => (idx.has(col) ? r[idx.get(col)!] : undefined) }));
 }
 
-// ---------- events ----------
-
-function parseEvents(rows: Row[], campaignIds: Set<string>, problems: string[]): TvEvent[] {
-  const out: TvEvent[] = [];
-  for (const row of rows) {
-    const where = `Events row ${row.n}`;
-    const title = text(row.get("title"));
-    if (!title) {
-      problems.push(`${where}: no title, row skipped`);
-      continue;
-    }
-    const label = `${where} (${title})`;
-    const start = toIsoDate(row.get("start_date"));
-    if (!start) {
-      problems.push(`${label}: start_date "${text(row.get("start_date"))}" isn't a date (use YYYY-MM-DD), row skipped`);
-      continue;
-    }
-    let end = start;
-    if (!isBlank(row.get("end_date"))) {
-      const e = toIsoDate(row.get("end_date"));
-      if (!e) {
-        problems.push(`${label}: end_date "${text(row.get("end_date"))}" isn't a date, row skipped`);
-        continue;
-      }
-      end = e;
-    }
-    if (end < start) {
-      problems.push(`${label}: end_date is before start_date, row skipped`);
-      continue;
-    }
-    const priority = text(row.get("priority")).toUpperCase();
-    if (!PRIORITIES.has(priority)) {
-      problems.push(`${label}: priority "${text(row.get("priority"))}" must be A, B, C or X, row skipped`);
-      continue;
-    }
-    let time: string | null = null;
-    if (!isBlank(row.get("time_sast"))) {
-      time = toTime(row.get("time_sast"));
-      if (!time) problems.push(`${label}: time_sast "${text(row.get("time_sast"))}" isn't HH:MM, shown without a time`);
-    }
-    const toConfirm = toBool(row.get("to_confirm"), `${label}: to_confirm`, problems);
-    let campaignId: string | null = text(row.get("campaign_id")) || null;
-    if (campaignId && !campaignIds.has(campaignId)) {
-      problems.push(`${label}: campaign_id "${campaignId}" isn't on the Campaigns tab, link ignored`);
-      campaignId = null;
-    }
-    out.push({
-      start,
-      end,
-      time,
-      title,
-      sport: text(row.get("sport")),
-      priority: priority as Priority,
-      toConfirm,
-      detail: text(row.get("detail")),
-      campaignId,
-    });
-  }
-  return out;
-}
-
-// ---------- campaigns ----------
-
-function parseCampaigns(rows: Row[], problems: string[]): TvCampaign[] {
-  const byId = new Map<string, TvCampaign>();
-  for (const row of rows) {
-    const where = `Campaigns row ${row.n}`;
-    const id = text(row.get("campaign_id"));
-    if (!id) {
-      problems.push(`${where}: no campaign_id, row skipped`);
-      continue;
-    }
-    const start = toIsoDate(row.get("seg_start"));
-    if (!start) {
-      problems.push(`${where} (${id}): seg_start "${text(row.get("seg_start"))}" isn't a date, row skipped`);
-      continue;
-    }
-    let end = start;
-    if (!isBlank(row.get("seg_end"))) {
-      const e = toIsoDate(row.get("seg_end"));
-      if (!e) {
-        problems.push(`${where} (${id}): seg_end "${text(row.get("seg_end"))}" isn't a date, row skipped`);
-        continue;
-      }
-      end = e;
-    }
-    if (end < start) {
-      problems.push(`${where} (${id}): seg_end is before seg_start, row skipped`);
-      continue;
-    }
-    let c = byId.get(id);
-    if (!c) {
-      const name = text(row.get("name"));
-      if (!name) {
-        problems.push(`${where} (${id}): no name, row skipped`);
-        continue;
-      }
-      c = { id, name, message: text(row.get("message")), segments: [] };
-      byId.set(id, c);
-    }
-    c.segments.push({
-      start,
-      end,
-      label: text(row.get("seg_label")),
-      main: toBool(row.get("main_window"), `${where} (${id}): main_window`, problems),
-    });
-  }
-  for (const c of byId.values()) c.segments.sort((a, b) => a.start.localeCompare(b.start));
-  return [...byId.values()];
-}
-
 // ---------- images ----------
 
 function parseImages(rows: Row[], problems: string[]): TvImageRule[] {
   const out: TvImageRule[] = [];
   for (const row of rows) {
-    const where = `Images row ${row.n}`;
+    const where = `TV images row ${row.n}`;
     const file = text(row.get("image_file"));
     if (!file) continue; // a placeholder ("To add") row
     const matchType = text(row.get("match_type")).toLowerCase();
@@ -315,24 +373,6 @@ function parseImages(rows: Row[], problems: string[]): TvImageRule[] {
     });
   }
   return out;
-}
-
-// ---------- settings ----------
-
-function parseSettings(rows: Row[], problems: string[]): TvSettings {
-  const settings: TvSettings = { week1Start: null };
-  for (const row of rows) {
-    const key = headerKey(row.get("key"));
-    if (key === "week1_start") {
-      if (isBlank(row.get("value"))) continue;
-      const d = toIsoDate(row.get("value"));
-      if (d) settings.week1Start = mondayOf(d);
-      else problems.push(`Settings row ${row.n}: week1_start isn't a date, ignored`);
-    } else if (key) {
-      problems.push(`Settings row ${row.n}: unknown setting "${text(row.get("key"))}", ignored`);
-    }
-  }
-  return settings;
 }
 
 // ---------- values ----------
@@ -408,7 +448,7 @@ function colLetter(i: number): string {
 // ---------- CSV (local dev data) ----------
 
 /** Minimal RFC 4180 CSV parser: quoted fields, doubled quotes, CRLF. */
-export function parseCsv(src: string): RawTab {
+export function parseCsvRows(src: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -439,6 +479,11 @@ export function parseCsv(src: string): RawTab {
     row.push(field);
     rows.push(row);
   }
-  const [headers = [], ...rest] = rows;
-  return { headers, rows: rest };
+  return rows;
+}
+
+/** CSV with its first row as headers. */
+export function parseCsv(src: string): RawTab {
+  const [headers = [], ...rows] = parseCsvRows(src);
+  return { headers, rows };
 }

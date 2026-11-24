@@ -145,7 +145,7 @@ function renderS2(now){
 }
 
 // ---- Scene 3 ----
-const MAX_CAMPS = 5; // what fits the 1920×1080 stage
+const MAX_CAMPS = 5; // upper bound; renderS3 then drops rows that would overlap the footer
 function renderS3(now){
   const box=document.getElementById("camps");box.replaceChildren();
   // 9-week view from the Monday of the current week
@@ -154,7 +154,9 @@ function renderS3(now){
   const ax=el("div","axis");
   [0,1,2,3,4].forEach(k=>{const t=T0+k*14*DAY;const s=el("span",null,fmtD(new Date(t)));s.style.left=pct(t)+"%";ax.appendChild(s)});
   box.appendChild(ax);
-  const inView=CAMPS.filter(cp=>cp.segs.some(([d,e])=>sast(d).getTime()<T1&&sast(e).getTime()+DAY>T0)).slice(0,MAX_CAMPS);
+  // soonest first: by the first window that hasn't finished
+  const nextT=cp=>Math.min(...cp.segs.filter(([,e])=>sast(e).getTime()+DAY>now.getTime()).map(([d])=>sast(d).getTime()),Infinity);
+  const inView=CAMPS.filter(cp=>cp.segs.some(([d,e])=>sast(d).getTime()<T1&&sast(e).getTime()+DAY>T0)).sort((a,b)=>nextT(a)-nextT(b)).slice(0,MAX_CAMPS);
   inView.forEach(cp=>{const r=el("div","cp");const l=el("div");l.appendChild(el("div","id",cp.id));l.appendChild(el("div","nm",cp.name));l.appendChild(el("div","ms",cp.msg));r.appendChild(l);
     const lane=el("div","lane");
     cp.segs.forEach(([d,e,lab,main])=>{let x0=pct(sast(d).getTime()),x1=pct(sast(e).getTime()+DAY);if(x1<=0||x0>=100)return;x0=Math.max(0,x0);x1=Math.min(100,x1);
@@ -168,6 +170,12 @@ function renderS3(now){
   const key=el("div","key");const k1=el("span");const i1=el("i");i1.style.background="var(--red)";k1.appendChild(i1);k1.appendChild(document.createTextNode("Main window"));
   const k2=el("span");const i2=el("i");i2.style.background="var(--blue)";k2.appendChild(i2);k2.appendChild(document.createTextNode("Pre-roll or tail"));
   key.appendChild(k1);key.appendChild(k2);box.appendChild(key);
+  // Long messages make rows taller: drop the furthest-out campaigns until the key clears the footer
+  const stage=document.getElementById("stage"),scale=stage.getBoundingClientRect().width/1920||1;
+  const footTop=document.querySelector(".foot").getBoundingClientRect().top;
+  const rows=[...box.querySelectorAll(".cp")];let hidden=0;
+  while(rows.length>1&&key.getBoundingClientRect().bottom>footTop-8*scale){rows.pop().remove();hidden++}
+  if(hidden)key.appendChild(el("span",null,`+${hidden} more Priority A campaign${hidden>1?"s":""} later`));
 }
 
 // ---- Notes: when the data was last read, and whether it has gone stale ----

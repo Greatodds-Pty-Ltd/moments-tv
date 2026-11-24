@@ -1,11 +1,13 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { GoogleAuth } from "google-auth-library";
-import { parseCsv, TABS, type Cell, type RawTabs, type TabName } from "./calendar";
+import { MASTER_TABS, parseCsv, parseCsvRows, type Cell, type MasterTabs } from "./calendar";
 
 // Where the raw data comes from.
-// - Production: the Google Sheet and image folder, read with a service account
-//   that has Viewer access to just those two items (never "Publish to web").
+// - Production: the Moments Campaign Calendar (the master sheet) and the image
+//   folder, read with a service account that has Viewer access to just those
+//   two items (never "Publish to web"). Only the Calendar, Priority A briefs
+//   and TV images tabs are requested; calendar.ts reads only the TV columns.
 // - Local dev without Google credentials: the CSVs in sheet-template/.
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID?.trim();
@@ -47,38 +49,39 @@ async function gget(url: string): Promise<Response> {
   return res;
 }
 
-const TAB_NAMES = Object.keys(TABS) as TabName[];
+const LOCAL_FILES = { calendar: "calendar.csv", briefs: "briefs.csv", images: "tv-images.csv" } as const;
 
-export async function fetchTabs(): Promise<RawTabs> {
+export async function fetchTabs(): Promise<MasterTabs> {
+  const read = (f: string) => readFile(join(LOCAL_DIR, f), "utf8").catch(() => null);
   if (sourceKind() === "local") {
-    const tabs: RawTabs = {};
-    for (const name of TAB_NAMES) {
-      try {
-        tabs[name] = parseCsv(await readFile(join(LOCAL_DIR, `${name.toLowerCase()}.csv`), "utf8"));
-      } catch {
-        /* optional tab absent */
-      }
-    }
-    return tabs;
+    const [cal, briefs, images] = await Promise.all([read(LOCAL_FILES.calendar), read(LOCAL_FILES.briefs), read(LOCAL_FILES.images)]);
+    return {
+      calendar: cal === null ? undefined : parseCsvRows(cal),
+      briefs: briefs === null ? undefined : parseCsvRows(briefs),
+      images: images === null ? undefined : parseCsv(images),
+    };
   }
 
-  // Which of our tabs exist (Images and Settings are optional), then read them in one call.
+  // Which of our tabs exist (TV images is optional), then read them in one call.
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SHEET_ID!)}`;
   const meta = (await (await gget(`${base}?fields=sheets.properties.title`)).json()) as {
     sheets: { properties: { title: string } }[];
   };
   const titles = new Map(meta.sheets.map((s) => [s.properties.title.trim().toLowerCase(), s.properties.title]));
-  const present = TAB_NAMES.filter((n) => titles.has(n.toLowerCase()));
-  if (!present.length) return {};
+  const keys = (Object.keys(MASTER_TABS) as (keyof typeof MASTER_TABS)[]).filter((k) => titles.has(MASTER_TABS[k].toLowerCase()));
+  if (!keys.length) return {};
 
   const q = new URLSearchParams({ valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER", majorDimension: "ROWS" });
-  for (const n of present) q.append("ranges", `'${titles.get(n.toLowerCase())!.replace(/'/g, "''")}'`);
+  for (const k of keys) q.append("ranges", `'${titles.get(MASTER_TABS[k].toLowerCase())!.replace(/'/g, "''")}'`);
   const body = (await (await gget(`${base}/values:batchGet?${q}`)).json()) as { valueRanges: { values?: unknown[][] }[] };
 
-  const tabs: RawTabs = {};
-  present.forEach((n, i) => {
-    const [headers = [], ...rows] = (body.valueRanges[i]?.values ?? []) as Cell[][];
-    tabs[n] = { headers, rows };
+  const tabs: MasterTabs = {};
+  keys.forEach((k, i) => {
+    const grid = (body.valueRanges[i]?.values ?? []) as Cell[][];
+    if (k === "images") {
+      const [headers = [], ...rows] = grid;
+      tabs.images = { headers, rows };
+    } else tabs[k] = grid;
   });
   return tabs;
 }

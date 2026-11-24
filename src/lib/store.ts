@@ -71,7 +71,7 @@ async function build(): Promise<Snapshot> {
   for (const rule of data.images) {
     const id = files.get(rule.file);
     if (!id) {
-      problems.push(`Images: "${rule.file}" (for ${rule.matchValue}) isn't in the image folder, skipped`);
+      problems.push(`TV images: "${rule.file}" (for ${rule.matchValue}) isn't in the image folder, skipped`);
       continue;
     }
     images.push({ ...rule, id, url: `/api/image/${id}` });
